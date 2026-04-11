@@ -7,6 +7,7 @@ import AdminDashboard from "./comportement/AdminDashboard";
 import Login from "./comportement/Login";
 import Signup from "./comportement/Signup";
 import UserDashboard from "./comportement/UserDashboard";
+import ResetPassword from "./comportement/ResetPassword";
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -14,6 +15,7 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<AdminDashboard />} />

@@ -1,8 +1,17 @@
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from database import Base, engine
 from routers import auth, admin, user
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY must be set in .env")
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -20,6 +29,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Add SessionMiddleware BEFORE routers
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    max_age=3600,
+    same_site="lax"
+)
+
 # Include routes
 app.include_router(auth.router)
 app.include_router(admin.router)

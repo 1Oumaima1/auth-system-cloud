@@ -19,7 +19,7 @@ def create_admin():
     db.add(admin_user)
     db.commit()
     db.close()
-    print("Admin created successfully")
+    print("Admin enregistree ")
 
 if __name__ == "__main__":
     create_admin()
