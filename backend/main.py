@@ -7,7 +7,7 @@ from database import Base, engine
 from routers import auth, admin, user
 from dotenv import load_dotenv
 import os
-
+import models
 # --- 1. CONFIGURATION INITIALE ---
 load_dotenv()
 
@@ -16,7 +16,7 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY must be set in Railway Variables")
 
 # Création des tables
-Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
