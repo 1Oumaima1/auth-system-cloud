@@ -45,7 +45,7 @@ app.include_router(user.router, prefix="/user_api")
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(CURRENT_DIR)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 frontend_path = os.path.join(BASE_DIR, "frontend", "build")
 
 
