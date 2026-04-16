@@ -1,0 +1,30 @@
+name: Build Frontend
+
+on:
+  push:
+    branches: [ main ]  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Build React App
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Commit build folder
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add frontend/build -f
+          git commit -m "Auto-build frontend" || echo "No changes to commit"
+          git push
