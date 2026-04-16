@@ -15,7 +15,6 @@ from email.mime.multipart import MIMEMultipart
 # ===================== LOAD ENV =====================
 load_dotenv()
 
-# Configuration des variables
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -24,7 +23,7 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 
 SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587 # Port TLS standard
+SMTP_PORT = 587 
 
 # ===================== SECURITY =====================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -47,11 +46,13 @@ def create_token(data: dict):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str):
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
 
-# ===================== EMAIL HELPER (POUR ÉVITER LES DOUBLONS) =====================
+# ===================== EMAIL HELPER =====================
 def _send_email_safe(recipient: str, subject: str, body: str):
-    """Fonction utilitaire sécurisée pour envoyer des emails sur Railway"""
     if not EMAIL_USER or not EMAIL_PASS:
         print("⚠️ Config Email manquante")
         return False
@@ -64,7 +65,6 @@ def _send_email_safe(recipient: str, subject: str, body: str):
 
     try:
         context = ssl.create_default_context()
-        # On force le timeout et le port en entier
         with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT), timeout=15) as server:
             server.starttls(context=context)
             server.login(EMAIL_USER, EMAIL_PASS)
@@ -81,11 +81,9 @@ def generate_reset_token() -> tuple[str, datetime]:
     return token, expiry
 
 def send_reset_email(email: str, token: str, nom: str, expiry: datetime):
-    # Utilisation de l'URL Railway pour le frontend (à adapter selon ton port Flutter)
-    base_url = os.getenv("FRONTEND_URL", "https://ton-app-flutter.up.railway.app")
+    base_url = os.getenv("FRONTEND_URL", "https://ton-app.up.railway.app")
     link = f"{base_url}/reset-password?token={token}"
-    
-    body = f"Bonjour {nom},\n\nCliquez pour réinitialiser votre mot de passe :\n{link}\n\nExpire dans 15 min."
+    body = f"Bonjour {nom},\n\nCliquez pour réinitialiser votre mot de passe :\n{link}"
     _send_email_safe(email, "Réinitialiser votre mot de passe", body)
 
 # ===================== EMAIL CONFIRMATION =====================
@@ -95,13 +93,16 @@ def generate_verification_token() -> str:
 def send_verification_email(email: str, token: str, nom: str):
     base_url = os.getenv("BASE_URL", "https://auth-system-cloud-production.up.railway.app")
     link = f"{base_url}/auth/verify/{token}"
-
     body = f"Bonjour {nom},\n\nCliquez ici pour vérifier votre compte :\n{link}"
     _send_email_safe(email, "Vérifiez votre compte", body)
 
 # ===================== AUTH DEPENDENCIES =====================
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    return decode_token(token)
+
 def get_current_admin(token: str = Depends(oauth2_scheme)):
     payload = decode_token(token)
-    if payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    # Vérifie que le rôle est bien admin (insensible à la casse si besoin)
+    if str(payload.get("role")).lower() != "admin":
+        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
     return payload
