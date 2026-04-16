@@ -23,7 +23,7 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 
 SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587 
+SMTP_PORT = 465
 
 # ===================== SECURITY =====================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -53,6 +53,7 @@ def decode_token(token: str):
 
 # ===================== EMAIL HELPER =====================
 def _send_email_safe(recipient: str, subject: str, body: str):
+    """Fonction sécurisée utilisant SMTP_SSL (Port 465) pour Railway"""
     if not EMAIL_USER or not EMAIL_PASS:
         print("⚠️ Config Email manquante")
         return False
@@ -64,14 +65,19 @@ def _send_email_safe(recipient: str, subject: str, body: str):
     msg.attach(MIMEText(body, "plain"))
 
     try:
+        # Configuration SSL
         context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT), timeout=15) as server:
-            server.starttls(context=context)
+        
+        # On utilise SMTP_SSL au lieu de SMTP
+        # Assure-toi que SMTP_PORT est bien 465 dans tes variables Railway
+        with smtplib.SMTP_SSL(SMTP_HOST, int(SMTP_PORT), timeout=15, context=context) as server:
             server.login(EMAIL_USER, EMAIL_PASS)
             server.send_message(msg)
+            print(f"✅ Email envoyé via SSL à {recipient}")
             return True
+            
     except Exception as e:
-        print(f"❌ Erreur SMTP : {e}")
+        print(f"❌ Erreur SMTP (SSL) : {e}")
         return False
 
 # ===================== PASSWORD RESET =====================
