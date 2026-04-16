@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.staticfiles import StaticFiles  
-from fastapi.responses import FileResponse   
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from database import Base, engine
 from routers import auth, admin, user
 from dotenv import load_dotenv
@@ -39,11 +39,22 @@ app.add_middleware(
     same_site="lax"
 )
 
-app.include_router(auth.router)
-app.include_router(admin.router)
-app.include_router(user.router)
+app.include_router(auth.router, prefix="/auth")
+app.include_router(admin.router, prefix="/admin_api")
+app.include_router(user.router, prefix="/user_api")
 
-frontend_path = os.path.join(os.getcwd(), "..", "frontend", "build")
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(CURRENT_DIR)
+frontend_path = os.path.join(BASE_DIR, "frontend", "build")
+
+
+print(f"--- DEBUG INFO ---")
+print(f"Current Directory: {CURRENT_DIR}")
+print(f"Project Root: {BASE_DIR}")
+print(f"Target Frontend Path: {frontend_path}")
+print(f"Frontend Path Exists: {os.path.exists(frontend_path)}")
+print(f"--- --- --- --- ---")
 
 if os.path.exists(frontend_path):
     
@@ -51,14 +62,21 @@ if os.path.exists(frontend_path):
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        if full_path.startswith(("auth", "admin", "user", "docs", "openapi.json")):
+        
+        if full_path.startswith(("auth", "admin_api", "user_api", "docs", "openapi.json")):
             return None 
-        return FileResponse(os.path.join(frontend_path, "index.html"))
-else:
-    print(f"Warning: Frontend build path not found at {frontend_path}")
+        
+        index_file = os.path.join(frontend_path, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "index.html not found"}
 
 @app.get("/")
 async def root():
-    if os.path.exists(os.path.join(frontend_path, "index.html")):
-        return FileResponse(os.path.join(frontend_path, "index.html"))
-    return {"message": "Backend is running, but Frontend build not found."}
+    index_file = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {
+        "message": "Backend is running!",
+        "frontend_status": "Build folder not found at " + frontend_path
+    }
