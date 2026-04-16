@@ -109,34 +109,42 @@ def generate_verification_token() -> str:
     return str(uuid.uuid4())
 
 def send_verification_email(email: str, token: str, nom: str):
+    # 1. Vérification des variables (Utilise les noms de ton .env)
     if not EMAIL_USER or not EMAIL_PASS:
-        raise Exception("Email config missing in .env")
+        print("⚠️ Erreur : Configuration email manquante dans le .env")
+        return # On sort pour ne pas faire planter tout le Signup
 
     msg = MIMEMultipart()
     msg["From"] = EMAIL_USER
     msg["To"] = email
-    msg["Subject"] = "Verify your account"
+    msg["Subject"] = "Vérifiez votre compte"
 
-    link = f"http://127.0.0.1:8000/auth/verify/{token}"
+    # ⚠️ IMPORTANT : Remplace l'URL locale par ton URL Railway en production
+    # Tu peux créer une variable d'environnement BASE_URL sur Railway
+    base_url = os.getenv("BASE_URL", "https://auth-system-cloud-production.up.railway.app")
+    link = f"{base_url}/auth/verify/{token}"
 
     body = f"""
 Bonjour {nom},
 
 Cliquez sur le lien pour vérifier votre compte :
-
 {link}
 
 Si ce n'est pas vous, ignorez cet email.
 """
-
     msg.attach(MIMEText(body, "plain"))
 
-    context = ssl.create_default_context()
-
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls(context=context)
-        print("EMAIL_USER:", EMAIL_USER)
-        print("EMAIL_PASS:", EMAIL_PASS)
-        print("SENDING EMAIL TO:", email)
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.send_message(msg)
+    try:
+        # 2. Configuration sécurisée
+        context = ssl.create_default_context()
+        
+        # Utilisation de 'with' pour s'assurer que la connexion se ferme
+        with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT), timeout=15) as server:
+            server.starttls(context=context) # Sécurisation de la connexion
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.send_message(msg)
+            print(f"✅ Email de vérification envoyé avec succès à {email}")
+            
+    except Exception as e:
+        # On affiche l'erreur dans les logs Railway mais on ne bloque pas l'utilisateur
+        print(f"❌ Erreur lors de l'envoi de l'email : {str(e)}")
