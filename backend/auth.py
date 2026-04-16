@@ -100,8 +100,8 @@ def send_verification_email(email: str, token: str, nom: str):
     _send_email_safe(email, "Vérifiez votre compte", body)
 
 # ===================== AUTH DEPENDENCIES =====================
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        return decode_token(token)
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+def get_current_admin(token: str = Depends(oauth2_scheme)):
+    payload = decode_token(token)
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return payload
