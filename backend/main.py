@@ -44,39 +44,38 @@ app.include_router(admin.router, prefix="/admin_api")
 app.include_router(user.router, prefix="/user_api")
 
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-frontend_path = os.path.join(BASE_DIR, "frontend", "build")
+possible_paths = [
+    os.path.join(os.getcwd(), "frontend", "build"),
+    "/app/frontend/build",  
+    os.path.join(os.path.dirname(os.getcwd()), "frontend", "build")
+]
 
+frontend_path = ""
+for p in possible_paths:
+    if os.path.exists(os.path.join(p, "index.html")):
+        frontend_path = p
+        break
 
 print(f"--- DEBUG INFO ---")
-print(f"Current Directory: {CURRENT_DIR}")
-print(f"Project Root: {BASE_DIR}")
-print(f"Target Frontend Path: {frontend_path}")
-print(f"Frontend Path Exists: {os.path.exists(frontend_path)}")
+print(f"Final Frontend Path selected: {frontend_path}")
 print(f"--- --- --- --- ---")
 
-if os.path.exists(frontend_path):
-    
+if frontend_path:
     app.mount("/static", StaticFiles(directory=os.path.join(frontend_path, "static")), name="static")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        
         if full_path.startswith(("auth", "admin_api", "user_api", "docs", "openapi.json")):
             return None 
         
         index_file = os.path.join(frontend_path, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return {"error": "index.html not found"}
+        return FileResponse(index_file)
 
 @app.get("/")
 async def root():
-    index_file = os.path.join(frontend_path, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
+    if frontend_path:
+        return FileResponse(os.path.join(frontend_path, "index.html"))
     return {
         "message": "Backend is running!",
-        "frontend_status": "Build folder not found at " + frontend_path
+        "frontend_status": "Build folder not found. Searched in: " + str(possible_paths)
     }
