@@ -22,11 +22,14 @@ jobs:
           cd frontend
           npm install
           npm run build
+          rm -rf ../backend/static
+          cp -r build ../backend/static
 
-      - name: Commit build folder
+      - name: Commit and Push Build to Backend
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
-          git add frontend/build -f
-          git commit -m "Auto-build frontend" || echo "No changes to commit"
+
+          git add backend/static -f
+          git commit -m "Move frontend build to backend/static" || echo "No changes to commit"
           git push
