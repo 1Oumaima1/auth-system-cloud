@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from schemas import UserCreate, UserLogin, ForgotPassword, ResetPassword, ResetPasswordWithToken
+from schemas import UserCreate, UserLogin, ForgotPassword, ResetPasswordWithToken
+from datetime import datetime
 
 from auth import (
     hash_password,
@@ -19,36 +20,44 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 import os
 
-router = APIRouter(prefix="/auth")
+# =============================
+# ROUTER
+# =============================
+# On laisse vide car le préfixe "/auth" est défini dans main.py
+router = APIRouter()
 
-# -----------------------------
-# OAuth Setup
-# -----------------------------
+# =============================
+# OAUTH GOOGLE
+# =============================
 oauth = OAuth()
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = "http://127.0.0.1:8000/auth/google/callback"
 
-
+# En production, Railway utilisera l'URL publique, en local il utilisera localhost
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "https://auth-system-cloud-production.up.railway.app/auth/google/callback"
+)
 
 oauth.register(
     name="google",
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={
-        "scope": "openid email profile"
-    }
+    client_kwargs={"scope": "openid email profile"}
 )
 
-# -----------------------------
+# =============================
 # SIGNUP
-# -----------------------------
+# =============================
 @router.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user.email).first():
-        return {"error": "Email already registered"}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Cet email est déjà utilisé"
+        )
 
     hashed = hash_password(user.password)
     token = generate_verification_token()
@@ -69,49 +78,63 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
     send_verification_email(new_user.email, token, new_user.nom)
 
-    return {"msg": "User created. Please verify email."}
+    return {"msg": "Compte créé. Veuillez vérifier votre email."}
 
-# -----------------------------
+# =============================
 # LOGIN
-# -----------------------------
+# =============================
 @router.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
 
     if not db_user or not verify_password(user.password, db_user.password):
-        return {"error": "Invalid credentials"}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Identifiants invalides"
+        )
 
     if not db_user.is_verified:
-        return {"error": "Please verify email first"}
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Veuillez vérifier votre email avant de vous connecter"
+        )
 
-    token = create_token({"user_id": db_user.id, "role": db_user.role})
+    token = create_token({
+        "user_id": db_user.id,
+        "role": db_user.role
+    })
 
-    return {"access_token": token, "role": db_user.role}
+    return {
+        "access_token": token,
+        "role": db_user.role
+    }
 
-# EMAIL VERIFY
-
+# =============================
+# VERIFY EMAIL
+# =============================
 @router.get("/verify/{token}")
 def verify_email(token: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.verification_token == token).first()
 
     if not user:
-        return {"error": "Invalid token"}
+        raise HTTPException(status_code=400, detail="Token invalide")
 
     user.is_verified = True
     user.verification_token = None
     db.commit()
 
-    return {"msg": "Email verified"}
+    return {"msg": "Email vérifié avec succès"}
 
-# -----------------------------
+# =============================
 # FORGOT PASSWORD
-# -----------------------------
+# =============================
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPassword, db: Session = Depends(get_db)):
+def forgot_password(request: ForgotPassword, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == request.email).first()
 
     if not user:
-        return {"msg": "If email exists, reset sent"}
+        # Sécurité : on ne confirme pas si l'email existe ou non
+        return {"msg": "Si l'email existe, un lien a été envoyé."}
 
     token, expiry = generate_reset_token()
     user.reset_token = token
@@ -120,56 +143,54 @@ async def forgot_password(request: ForgotPassword, db: Session = Depends(get_db)
 
     send_reset_email(user.email, token, user.nom, expiry)
 
-    return {"msg": "Reset email sent"}
+    return {"msg": "Email de réinitialisation envoyé"}
 
-@router.post("/auth/reset-password")
-async def reset_password(request: ResetPasswordWithToken, db: Session = Depends(get_db)):
+# =============================
+# RESET PASSWORD
+# =============================
+@router.post("/reset-password")
+def reset_password(request: ResetPasswordWithToken, db: Session = Depends(get_db)):
     user = db.query(User).filter(
         User.reset_token == request.token,
         User.reset_expires_at > datetime.utcnow()
     ).first()
 
     if not user:
-        return {"error": "Invalid or expired token"}
+        raise HTTPException(status_code=400, detail="Token invalide ou expiré")
 
     if request.password != request.confirm_password:
-        return {"error": "Passwords do not match"}
+        raise HTTPException(status_code=400, detail="Les mots de passe ne correspondent pas")
 
     user.password = hash_password(request.password)
     user.reset_token = None
     user.reset_expires_at = None
     db.commit()
 
-    return {"msg": "Password reset success"}
+    return {"msg": "Mot de passe réinitialisé avec succès"}
 
-# -----------------------------
+# =============================
 # GOOGLE LOGIN
-# -----------------------------
+# =============================
 @router.get("/google")
 async def google_login(request: Request):
     if not GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+        raise HTTPException(status_code=500, detail="Configuration Google OAuth manquante")
 
     return await oauth.google.authorize_redirect(
         request,
         GOOGLE_REDIRECT_URI
     )
 
-# -----------------------------
+# =============================
 # GOOGLE CALLBACK
-# -----------------------------
+# =============================
 @router.get("/google/callback")
 async def google_callback(request: Request, db: Session = Depends(get_db)):
-    if not GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
-
     token = await oauth.google.authorize_access_token(request)
-
     resp = await oauth.google.get(
         "https://openidconnect.googleapis.com/v1/userinfo",
         token=token
     )
-
     userinfo = resp.json()
 
     email = userinfo["email"]
@@ -192,16 +213,19 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             is_verified=True
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
-
     elif not user.google_id:
         user.google_id = google_id
         user.is_verified = True
-        db.commit()
+    
+    db.commit()
+    db.refresh(user)
 
-    jwt_token = create_token({"user_id": user.id, "role": user.role})
+    jwt_token = create_token({
+        "user_id": user.id,
+        "role": user.role
+    })
 
+    # Redirection vers la racine du site (fonctionne en local et prod)
     return RedirectResponse(
-        url=f"http://localhost:3000/?token={jwt_token}&role={user.role}"
+        url=f"/?token={jwt_token}&role={user.role}"
     )
