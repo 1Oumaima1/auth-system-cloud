@@ -37,11 +37,10 @@ const AuthForm = ({ type = "login", onToggle }) => {
     setError("");
 
     try {
+    
       const endpoint = type === "login" ? "/auth/login" : "/auth/signup";
-      const res = await axios.post(
-  `https://auth-system-cloud-production.up.railway.app${endpoint}`,
-  formData
-);
+    
+      const res = await axios.post(endpoint, formData);
 
       if (type === "login") {
         const { access_token, role } = res.data;
@@ -58,7 +57,6 @@ const AuthForm = ({ type = "login", onToggle }) => {
     }
   };
 
-  // LOADING OVERLAY
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 p-8">
@@ -85,7 +83,6 @@ const AuthForm = ({ type = "login", onToggle }) => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        {/* HEADER */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             {type === "login" ? "Bon retour" : "Créer un compte"}
@@ -98,21 +95,18 @@ const AuthForm = ({ type = "login", onToggle }) => {
         </div>
 
         <GlassCard className="bg-white/90 p-8 space-y-6 shadow-xl">
-          {/* ERROR */}
           {error && (
             <div className="p-3 rounded-xl bg-red-100 text-red-700 text-center text-sm">
               {error}
             </div>
           )}
 
-          {/* SUCCESS */}
           {successMsg && (
             <div className="p-3 rounded-xl bg-green-100 text-green-700 text-center text-sm">
               {successMsg}
             </div>
           )}
 
-          {/* FORM */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {type === "signup" && (
               <>
@@ -158,15 +152,12 @@ const AuthForm = ({ type = "login", onToggle }) => {
             </GradientButton>
           </form>
 
-          {/* FORGOT PASSWORD */}
           {type === "login" && (
             <button
               className="text-sm text-slate-500 hover:text-indigo-600 text-center w-full"
               onClick={async () => {
-                await axios.post(
-  "https://auth-system-cloud-production.up.railway.app/auth/forgot-password",
-  { email: formData.email }
-                );
+                //  CHANGEMENT : Utilisation du chemin relatif ici aussi
+                await axios.post("/auth/forgot-password", { email: formData.email });
                 setError("Lien envoyé si email existe.");
               }}
             >
@@ -174,19 +165,16 @@ const AuthForm = ({ type = "login", onToggle }) => {
             </button>
           )}
 
-          {/* OAUTH */}
           {type === "login" && (
             <div className="pt-4">
               <div className="flex justify-center gap-6">
                 <OAuthButton provider="google" />
                 <OAuthButton provider="facebook" />
               </div>
-
               <p className="text-center text-xs text-gray-400 mt-3">ou</p>
             </div>
           )}
 
-          {/* SWITCH BUTTON */}
           <div className="pt-6">
             <button
               onClick={onToggle}
@@ -205,4 +193,3 @@ const AuthForm = ({ type = "login", onToggle }) => {
 };
 
 export default AuthForm;
-
