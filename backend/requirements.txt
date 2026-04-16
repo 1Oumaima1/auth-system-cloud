@@ -12,5 +12,4 @@ authlib==1.5.1
 email-validator==2.2.0
 itsdangerous
 httpx
-bcrypt==4.0.1
-passlib[bcrypt]
+bcrypt==3.2.0
