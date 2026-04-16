@@ -39,9 +39,9 @@ const AuthForm = ({ type = "login", onToggle }) => {
     try {
       const endpoint = type === "login" ? "/auth/login" : "/auth/signup";
       const res = await axios.post(
-        `http://127.0.0.1:8000${endpoint}`,
-        formData
-      );
+  `https://auth-system-cloud-production.up.railway.app${endpoint}`,
+  formData
+);
 
       if (type === "login") {
         const { access_token, role } = res.data;
@@ -164,8 +164,8 @@ const AuthForm = ({ type = "login", onToggle }) => {
               className="text-sm text-slate-500 hover:text-indigo-600 text-center w-full"
               onClick={async () => {
                 await axios.post(
-                  "http://127.0.0.1:8000/auth/forgot-password",
-                  { email: formData.email }
+  "https://auth-system-cloud-production.up.railway.app/auth/forgot-password",
+  { email: formData.email }
                 );
                 setError("Lien envoyé si email existe.");
               }}
